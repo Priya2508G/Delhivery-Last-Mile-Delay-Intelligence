@@ -235,12 +235,18 @@ The following regression algorithms were evaluated:
 
 ### 6.2 Validation comparison
 
-| Model | Validation RMSE | Validation R² |
+| Maximum Depth | Training RMSE | Validation RMSE |
 |---|---:|---:|
-| Linear Regression | 4.8912 | 0.9313 |
-| Decision Tree | 6.2796 | 0.8867 |
-| Random Forest | 5.4680 | 0.9141 |
-| Gradient Boosting | 4.9165 | 0.9306 |
+| 1 | 11.6334 | 12.1324 |
+| 2 | 9.3687 | 10.4114 |
+| 3 | 7.5295 | 8.7033 |
+| 4 | 6.0999 | 7.3896 |
+| 6 | 4.7114 | 6.2796 |
+| 8 | 3.3360 | 6.8385 |
+| 12 | 1.3613 | 7.4173 |
+| Unlimited | 0.0000 | 7.7890 |
+
+The training error decreases as tree depth increases. However, validation error begins increasing after depth 6, indicating overfitting. Therefore, depth 6 provides the best validation performance among the tested depths.
 
 **Selected model: Linear Regression**
 
@@ -281,7 +287,7 @@ Different maximum depths were tested to understand the bias–variance trade-off
 | 0.1 | 0.931 |
 | 1.0 | 0.844 |
 
-A learning rate of 0.1 achieved the best validation R² among the tested values.
+A learning rate of 0.01 produces slower learning within the tested boosting stages. A learning rate of 1.0 makes larger updates and gives weaker validation performance. The learning rate of 0.1 provides the best validation R² score of 0.931 and is selected for this experiment.
 
 The lower learning rate of 0.01 may not learn sufficiently within the tested configuration, while 1.0 gives weaker validation performance.
 
@@ -291,6 +297,8 @@ The lower learning rate of 0.01 may not learn sufficiently within the tested con
 |---|---:|---:|
 | Linear Regression | 0.9261 | 0.0048 |
 | Gradient Boosting | 0.9352 | 0.0044 |
+
+Gradient Boosting achieved a slightly higher mean cross-validation R² score. However, Linear Regression achieved a slightly lower validation RMSE (4.8912 compared with 4.9165 for Gradient Boosting). Since validation RMSE is the selection criterion, Linear Regression was retained as the final regression model.
 
 Gradient Boosting achieved a higher mean cross-validation R². However, Linear Regression achieved a slightly lower validation RMSE (4.8912 compared with 4.9165).
 
@@ -366,6 +374,7 @@ The five noise columns investigated were:
 The combined Random Forest importance of the five noise columns was approximately 22.44%.
 
 However, all five noise columns had F-score ranks outside the top seven (ranks 8, 12, 14, 16, and 17).
+The five noise columns are label_print_batch, scanner_build_no, tape_roll_no, sticker_serial_mod, and shelf_slot_no. Together, they contribute 22.44% of the Random Forest feature importance. However, all five noise features rank outside the final seven selected features. This supports excluding them from the final classification model.
 
 The final seven selected features were:
 
@@ -442,6 +451,10 @@ Confusion matrix:
 |---|---:|---:|
 | Actual not delayed | 125 | 14 |
 | Actual delayed | 10 | 31 |
+
+The final model correctly classified 125 on-time shipments and 31 delayed shipments. It produced 14 false positives and 10 false negatives.
+
+The recall of 75.61% means the model detected approximately 7.6 out of every 10 actually delayed shipments. The precision of 68.89% means approximately 6.9 out of every 10 shipments flagged as delayed were truly delayed. These results help the operations team identify shipments that may need proactive attention.
 
 **Interpretation:**
 
@@ -531,7 +544,7 @@ Recommended operational actions:
 - Contact the two proactive-call shipments to check delivery progress and possible issues.
 - Continue normal monitoring for the remaining 40 shipments.
 
-The classification test recall of 75.61% means approximately 8 out of every 10 delayed shipments were identified in the held-out test set. However, the model missed 10 delayed test shipments, so operational monitoring must continue even when a shipment is not flagged.
+The classification test recall of 75.61% means approximately approximately 7.6 out of every 10 delayed shipments were identified in the held-out test set. However, the model missed 10 delayed test shipments, so operational monitoring must continue even when a shipment is not flagged.
 
 ## 9. Model Packaging and Reproducibility
 

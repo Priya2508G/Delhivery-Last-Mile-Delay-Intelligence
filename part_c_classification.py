@@ -129,9 +129,8 @@ model_results = []
 
 model_results.append({
     "model": "blind_all_on_time",
-    "split": "val",
-    **baseline_metrics,
-    **baseline_confusion
+    **baseline_confusion,
+    **baseline_metrics
 })
 
 
@@ -158,9 +157,8 @@ logistic_metrics = calculate_metrics(
 
 model_results.append({
     "model": "logistic_regression",
-    "split": "val",
-    **logistic_metrics,
-    **get_confusion_values(y_val, logistic_prediction)
+    **get_confusion_values(y_val, logistic_prediction),
+    **logistic_metrics
 })
 
 
@@ -217,10 +215,9 @@ tree_metrics = calculate_metrics(
 )
 
 model_results.append({
-    "model": "decision_tree",
-    "split": "val",
-    **tree_metrics,
-    **get_confusion_values(y_val, tree_prediction)
+    "model": f"decision_tree_depth_{best_tree_depth}",
+    **get_confusion_values(y_val, tree_prediction),
+    **tree_metrics
 })
 
 print("\nSelected decision tree depth:", best_tree_depth)
@@ -245,10 +242,9 @@ forest_metrics = calculate_metrics(
 )
 
 model_results.append({
-    "model": "random_forest",
-    "split": "val",
-    **forest_metrics,
-    **get_confusion_values(y_val, forest_prediction)
+    "model": "random_forest_default",
+    **get_confusion_values(y_val, forest_prediction),
+    **forest_metrics
 })
 
 
@@ -256,7 +252,10 @@ model_results.append({
 # 8. SAVE VALIDATION MODEL RESULTS
 # --------------------------------------------------
 
-models_df = pd.DataFrame(model_results)
+models_df = pd.DataFrame(
+    model_results,
+    columns=["model", "TN", "FP", "FN", "TP", "accuracy", "precision", "recall", "f1"]
+)
 
 models_df.to_csv(
     "outputs/part_c_models.csv",
@@ -284,17 +283,11 @@ f_scores = feature_selector_all.scores_
 
 feature_scores = pd.DataFrame({
     "feature": FEATURES,
-    "forest_importance": forest_importance,
-    "f_score": f_scores
+    "f_score": f_scores,
+    "rf_importance": forest_importance
 })
 
-feature_scores["importance_rank"] = (
-    feature_scores["forest_importance"]
-    .rank(ascending=False, method="min")
-    .astype(int)
-)
-
-feature_scores["f_score_rank"] = (
+feature_scores["f_rank"] = (
     feature_scores["f_score"]
     .rank(ascending=False, method="min")
     .astype(int)
@@ -312,9 +305,9 @@ feature_scores["is_noise"] = (
     feature_scores["feature"].isin(noise_columns)
 )
 
-feature_scores = feature_scores.sort_values(
-    "importance_rank"
-)
+feature_scores = feature_scores[
+    ["feature", "f_score", "f_rank", "rf_importance", "is_noise"]
+].sort_values("rf_importance", ascending=False)
 
 feature_scores.to_csv(
     "outputs/part_c_feature_scores.csv",
@@ -323,18 +316,17 @@ feature_scores.to_csv(
 
 noise_importance_sum = feature_scores.loc[
     feature_scores["is_noise"],
-    "forest_importance"
+    "rf_importance"
 ].sum()
 
 print("\nTop seven features:")
 print(
     feature_scores.head(7)[
-        ["feature", "forest_importance", "f_score"]
+        ["feature", "rf_importance", "f_score", "f_rank"]
     ].to_string(index=False)
 )
 
 print("\nNoise feature importance sum:", round(noise_importance_sum, 4))
-
 
 # --------------------------------------------------
 # 10. SELECTKBEST FEATURE COUNT COMPARISON
@@ -377,7 +369,7 @@ for k in [5, 7, 10, 12, 17]:
 
     selectk_results.append({
         "k": k,
-        **metrics
+        "val_f1": metrics["f1"]
     })
 
 
@@ -504,8 +496,8 @@ default_metrics = calculate_metrics(
 tuning_results = [
 
     {
-        "method": "grid_search",
-        "candidate_count": 27,
+        "search": "grid_search",
+        "candidates": 27,
         "cv_folds": 5,
         "total_fits": 135,
         "best_cv_accuracy": round(grid_best_cv_accuracy, 4),
@@ -517,8 +509,8 @@ tuning_results = [
     },
 
     {
-        "method": "randomized_search",
-        "candidate_count": 9,
+        "search": "randomized_search",
+        "candidates": 9,
         "cv_folds": 5,
         "total_fits": 45,
         "best_cv_accuracy": round(random_best_cv_accuracy, 4),
@@ -530,8 +522,8 @@ tuning_results = [
     },
 
     {
-        "method": "default_forest_same_7_features",
-        "candidate_count": 1,
+        "search": "default_forest_same_7_features",
+        "candidates": 1,
         "cv_folds": 0,
         "total_fits": 1,
         "best_cv_accuracy": np.nan,
@@ -540,7 +532,11 @@ tuning_results = [
     }
 ]
 
-tuning_df = pd.DataFrame(tuning_results)
+tuning_df = pd.DataFrame(
+    tuning_results,
+    columns=["search", "candidates", "cv_folds", "total_fits",
+             "best_params", "best_cv_accuracy", "val_f1"]
+)
 
 tuning_df.to_csv(
     "outputs/part_c_tuning.csv",
@@ -635,11 +631,16 @@ for threshold in threshold_values:
 
     threshold_results.append({
         "threshold": threshold,
+        **get_confusion_values(y_val, prediction),
         **metrics
     })
 
 
-threshold_df = pd.DataFrame(threshold_results)
+threshold_df = pd.DataFrame(
+    threshold_results,
+    columns=["threshold", "TN", "FP", "FN", "TP",
+             "accuracy", "precision", "recall", "f1"]
+)
 
 threshold_df.to_csv(
     "outputs/part_c_thresholds.csv",
@@ -682,11 +683,15 @@ final_test_confusion = get_confusion_values(
 
 final_test_row = {
     "threshold": chosen_threshold,
-    **final_test_metrics,
-    **final_test_confusion
+    **final_test_confusion,
+    **final_test_metrics
 }
 
-pd.DataFrame([final_test_row]).to_csv(
+pd.DataFrame(
+    [final_test_row],
+    columns=["threshold", "TN", "FP", "FN", "TP",
+             "accuracy", "precision", "recall", "f1"]
+).to_csv(
     "outputs/part_c_final_test.csv",
     index=False
 )

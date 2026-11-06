@@ -7,7 +7,6 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances
 
-
 # --------------------------------------------------
 # 1. FOLDERS AND INPUT FILES
 # --------------------------------------------------
@@ -16,7 +15,6 @@ os.makedirs("outputs", exist_ok=True)
 
 data = pd.read_csv("data/modelling_table.csv")
 hubs = pd.read_csv("data/hubs.csv")
-
 
 # --------------------------------------------------
 # 2. CREATE HUB PROFILE
@@ -34,9 +32,8 @@ hub_profile = (
     .reset_index()
 )
 
-# Merge hub details
 hub_profile = hub_profile.merge(
-    hubs,
+    hubs[["hub_id", "hub_city", "hub_tier"]],
     on="hub_id",
     how="left"
 )
@@ -46,7 +43,17 @@ hub_profile = (
     .reset_index(drop=True)
 )
 
-hub_profile.to_csv(
+# Save only the required hub profile columns
+profile_columns = [
+    "hub_id",
+    "shipments",
+    "mean_delivery_hours",
+    "delay_rate",
+    "mean_distance_km",
+    "mean_n_stops"
+]
+
+hub_profile[profile_columns].to_csv(
     "outputs/hub_profile.csv",
     index=False,
     float_format="%.4f"
@@ -54,7 +61,6 @@ hub_profile.to_csv(
 
 print("\nHub profile created.")
 print("Number of hubs:", len(hub_profile))
-
 
 # --------------------------------------------------
 # 3. PREPARE CLUSTERING FEATURES
@@ -71,7 +77,6 @@ X = hub_profile[CLUSTER_FEATURES].copy()
 
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
-
 
 # --------------------------------------------------
 # 4. CALCULATE CLUSTER SEPARATION
@@ -115,11 +120,8 @@ for k in [2, 3, 4, 5]:
     separation_results.append({
         "K": k,
         "across_over_within": ratio,
-        "cluster_sizes": "-".join(
-            map(str, cluster_sizes)
-        )
+        "cluster_sizes": "-".join(map(str, cluster_sizes))
     })
-
 
 separation_df = pd.DataFrame(separation_results)
 
@@ -132,7 +134,6 @@ separation_df.to_csv(
 print("\nCluster separation results:")
 print(separation_df.to_string(index=False))
 
-
 # --------------------------------------------------
 # 5. FINAL THREE-CLUSTER MODEL
 # --------------------------------------------------
@@ -144,7 +145,6 @@ kmeans = KMeans(
 )
 
 hub_profile["cluster"] = kmeans.fit_predict(X_scaled)
-
 
 # --------------------------------------------------
 # 6. NAME SEGMENTS BY DELAY RATE
@@ -168,20 +168,18 @@ hub_profile["segment"] = (
     hub_profile["cluster"].map(segment_names)
 )
 
-
 # --------------------------------------------------
 # 7. SAVE HUB SEGMENTS
 # --------------------------------------------------
 
 hub_segments = hub_profile[
-    ["hub_id", "segment"]
+    ["hub_id", "segment", "hub_city", "hub_tier"]
 ].copy()
 
 hub_segments.to_csv(
     "outputs/hub_segments.csv",
     index=False
 )
-
 
 # --------------------------------------------------
 # 8. CREATE SEGMENT PROFILE
@@ -199,11 +197,7 @@ segment_profile = (
     .reset_index()
 )
 
-segment_order = [
-    "Standard",
-    "Watch",
-    "Escalate"
-]
+segment_order = ["Standard", "Watch", "Escalate"]
 
 segment_profile["segment"] = pd.Categorical(
     segment_profile["segment"],
@@ -226,7 +220,6 @@ segment_profile.to_csv(
     float_format="%.4f"
 )
 
-
 # --------------------------------------------------
 # 9. FIND TIER VS SEGMENT MISMATCHES
 # --------------------------------------------------
@@ -245,7 +238,6 @@ mismatches = hub_profile[
     hub_profile["segment"] != hub_profile["expected_segment"]
 ].copy()
 
-# Correct column name: hub_city
 mismatch_columns = [
     "hub_id",
     "hub_city",
@@ -264,7 +256,6 @@ mismatches.to_csv(
     index=False
 )
 
-
 # --------------------------------------------------
 # 10. DISPLAY FINAL RESULTS
 # --------------------------------------------------
@@ -277,7 +268,6 @@ print(segment_profile.to_string(index=False))
 
 print("\nTier vs segment mismatches:")
 print(mismatches.to_string(index=False))
-
 
 # --------------------------------------------------
 # 11. COMPLETION
